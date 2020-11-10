@@ -9,21 +9,43 @@
 namespace App\Http\Controllers;
 
 
+use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Auth;
+
 class ManagerController extends Controller
 {
-    public function register()
+    /**
+     * 后台登录
+     *
+     * @param Request $request
+     *
+     * @return int
+     * @throws \Illuminate\Validation\ValidationException
+     */
+    public function login(Request $request)
     {
-        return 000;
+        $credentials = $this->validate($request, [
+            'email'    => 'required|email|max:255',
+            'password' => 'required'
+        ]);
+
+        print_r(Auth::guard('admin'));exit();
+
+        //验证登录
+        if (Auth::guard('admin')->attempt($credentials)) {
+
+            return 0;
+
+        } else {
+
+            return 1;
+        }
     }
 
-    public function getUserInfo()
-    {
-        return 111;
-    }
 
-    public function editUserInfo()
+    public function logout()
     {
-        return 222;
+
     }
 
 }

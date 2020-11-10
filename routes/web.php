@@ -1,6 +1,7 @@
 <?php
 
 use Illuminate\Support\Facades\Route;
+use \App\Http\Controllers\ManagerController;
 
 /*
 |--------------------------------------------------------------------------
@@ -15,4 +16,13 @@ use Illuminate\Support\Facades\Route;
 
 Route::get('/', function () {
     return view('welcome');
+});
+
+
+Route::prefix('admin')->group(function () {
+
+    Route::get('manager/login', [ManagerController::class, 'login']);
+    Route::get('manager/get_user_info', [ManagerController::class, 'getUserInfo']);
+
+
 });
