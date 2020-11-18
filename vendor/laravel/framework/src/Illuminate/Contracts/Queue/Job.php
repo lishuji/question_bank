@@ -5,13 +5,6 @@ namespace Illuminate\Contracts\Queue;
 interface Job
 {
     /**
-     * Get the UUID of the job.
-     *
-     * @return string|null
-     */
-    public function uuid();
-
-    /**
      * Get the job identifier.
      *
      * @return string
@@ -35,19 +28,10 @@ interface Job
     /**
      * Release the job back into the queue.
      *
-     * Accepts a delay specified in seconds.
-     *
-     * @param  int  $delay
-     * @return void
+     * @param  int   $delay
+     * @return mixed
      */
     public function release($delay = 0);
-
-    /**
-     * Determine if the job was released back into the queue.
-     *
-     * @return bool
-     */
-    public function isReleased();
 
     /**
      * Delete the job from the queue.
@@ -78,26 +62,12 @@ interface Job
     public function attempts();
 
     /**
-     * Determine if the job has been marked as a failure.
+     * Process an exception that caused the job to fail.
      *
-     * @return bool
-     */
-    public function hasFailed();
-
-    /**
-     * Mark the job as "failed".
-     *
+     * @param  \Throwable  $e
      * @return void
      */
-    public function markAsFailed();
-
-    /**
-     * Delete the job, call the "failed" method, and raise the failed job event.
-     *
-     * @param  \Throwable|null  $e
-     * @return void
-     */
-    public function fail($e = null);
+    public function failed($e);
 
     /**
      * Get the number of times to attempt a job.
@@ -105,13 +75,6 @@ interface Job
      * @return int|null
      */
     public function maxTries();
-
-    /**
-     * Get the maximum number of exceptions allowed, regardless of attempts.
-     *
-     * @return int|null
-     */
-    public function maxExceptions();
 
     /**
      * Get the number of seconds the job can run.
@@ -125,7 +88,7 @@ interface Job
      *
      * @return int|null
      */
-    public function retryUntil();
+    public function timeoutAt();
 
     /**
      * Get the name of the queued job class.

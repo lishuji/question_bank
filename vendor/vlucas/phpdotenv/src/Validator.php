@@ -1,57 +1,46 @@
 <?php
 
-declare(strict_types=1);
-
 namespace Dotenv;
 
+use Dotenv\Exception\InvalidCallbackException;
 use Dotenv\Exception\ValidationException;
-use Dotenv\Repository\RepositoryInterface;
-use Dotenv\Util\Regex;
-use Dotenv\Util\Str;
 
+/**
+ * This is the validator class.
+ *
+ * It's responsible for applying validations against a number of variables.
+ */
 class Validator
 {
     /**
-     * The environment repository instance.
-     *
-     * @var \Dotenv\Repository\RepositoryInterface
-     */
-    private $repository;
-
-    /**
      * The variables to validate.
      *
-     * @var string[]
+     * @var array
      */
-    private $variables;
+    protected $variables;
+
+    /**
+     * The loader instance.
+     *
+     * @var \Dotenv\Loader
+     */
+    protected $loader;
 
     /**
      * Create a new validator instance.
      *
-     * @param \Dotenv\Repository\RepositoryInterface $repository
-     * @param string[]                               $variables
-     *
-     * @throws \Dotenv\Exception\ValidationException
+     * @param array          $variables
+     * @param \Dotenv\Loader $loader
      *
      * @return void
      */
-    public function __construct(RepositoryInterface $repository, array $variables)
+    public function __construct(array $variables, Loader $loader)
     {
-        $this->repository = $repository;
         $this->variables = $variables;
-    }
+        $this->loader = $loader;
 
-    /**
-     * Assert that each variable is present.
-     *
-     * @throws \Dotenv\Exception\ValidationException
-     *
-     * @return \Dotenv\Validator
-     */
-    public function required()
-    {
-        return $this->assert(
-            static function (?string $value) {
+        $this->assertCallback(
+            function ($value) {
                 return $value !== null;
             },
             'is missing'
@@ -61,15 +50,13 @@ class Validator
     /**
      * Assert that each variable is not empty.
      *
-     * @throws \Dotenv\Exception\ValidationException
-     *
      * @return \Dotenv\Validator
      */
     public function notEmpty()
     {
-        return $this->assertNullable(
-            static function (string $value) {
-                return Str::len(\trim($value)) > 0;
+        return $this->assertCallback(
+            function ($value) {
+                return strlen(trim($value)) > 0;
             },
             'is empty'
         );
@@ -78,15 +65,13 @@ class Validator
     /**
      * Assert that each specified variable is an integer.
      *
-     * @throws \Dotenv\Exception\ValidationException
-     *
      * @return \Dotenv\Validator
      */
     public function isInteger()
     {
-        return $this->assertNullable(
-            static function (string $value) {
-                return \ctype_digit($value);
+        return $this->assertCallback(
+            function ($value) {
+                return ctype_digit($value);
             },
             'is not an integer'
         );
@@ -95,19 +80,17 @@ class Validator
     /**
      * Assert that each specified variable is a boolean.
      *
-     * @throws \Dotenv\Exception\ValidationException
-     *
      * @return \Dotenv\Validator
      */
     public function isBoolean()
     {
-        return $this->assertNullable(
-            static function (string $value) {
+        return $this->assertCallback(
+            function ($value) {
                 if ($value === '') {
                     return false;
                 }
 
-                return \filter_var($value, \FILTER_VALIDATE_BOOLEAN, \FILTER_NULL_ON_FAILURE) !== null;
+                return filter_var($value, FILTER_VALIDATE_BOOLEAN, FILTER_NULL_ON_FAILURE) !== null;
             },
             'is not a boolean'
         );
@@ -118,92 +101,49 @@ class Validator
      *
      * @param string[] $choices
      *
-     * @throws \Dotenv\Exception\ValidationException
-     *
      * @return \Dotenv\Validator
      */
     public function allowedValues(array $choices)
     {
-        return $this->assertNullable(
-            static function (string $value) use ($choices) {
-                return \in_array($value, $choices, true);
+        return $this->assertCallback(
+            function ($value) use ($choices) {
+                return in_array($value, $choices);
             },
-            \sprintf('is not one of [%s]', \implode(', ', $choices))
-        );
-    }
-
-    /**
-     * Assert that each variable matches the given regular expression.
-     *
-     * @param string $regex
-     *
-     * @throws \Dotenv\Exception\ValidationException
-     *
-     * @return \Dotenv\Validator
-     */
-    public function allowedRegexValues(string $regex)
-    {
-        return $this->assertNullable(
-            static function (string $value) use ($regex) {
-                return Regex::matches($regex, $value)->success()->getOrElse(false);
-            },
-            \sprintf('does not match "%s"', $regex)
+            'is not an allowed value'
         );
     }
 
     /**
      * Assert that the callback returns true for each variable.
      *
-     * @param callable(?string):bool $callback
-     * @param string                 $message
+     * @param callable $callback
+     * @param string   $message
      *
-     * @throws \Dotenv\Exception\ValidationException
+     * @throws \Dotenv\Exception\InvalidCallbackException|\Dotenv\Exception\ValidationException
      *
      * @return \Dotenv\Validator
      */
-    private function assert(callable $callback, string $message)
+    protected function assertCallback($callback, $message = 'failed callback assertion')
     {
-        $failing = [];
+        if (!is_callable($callback)) {
+            throw new InvalidCallbackException('The provided callback must be callable.');
+        }
 
-        foreach ($this->variables as $variable) {
-            if ($callback($this->repository->get($variable)) === false) {
-                $failing[] = \sprintf('%s %s', $variable, $message);
+        $variablesFailingAssertion = array();
+        foreach ($this->variables as $variableName) {
+            $variableValue = $this->loader->getEnvironmentVariable($variableName);
+            if (call_user_func($callback, $variableValue) === false) {
+                $variablesFailingAssertion[] = $variableName." $message";
             }
         }
 
-        if (\count($failing) > 0) {
-            throw new ValidationException(\sprintf(
+        if (count($variablesFailingAssertion) > 0) {
+            throw new ValidationException(sprintf(
                 'One or more environment variables failed assertions: %s.',
-                \implode(', ', $failing)
+                implode(', ', $variablesFailingAssertion)
             ));
         }
 
         return $this;
-    }
-
-    /**
-     * Assert that the callback returns true for each variable.
-     *
-     * Skip checking null variable values.
-     *
-     * @param callable(string):bool $callback
-     * @param string                $message
-     *
-     * @throws \Dotenv\Exception\ValidationException
-     *
-     * @return \Dotenv\Validator
-     */
-    private function assertNullable(callable $callback, string $message)
-    {
-        return $this->assert(
-            static function (?string $value) use ($callback) {
-                if ($value === null) {
-                    return true;
-                }
-
-                return $callback($value);
-            },
-            $message
-        );
     }
 }

@@ -3,10 +3,10 @@
 namespace Illuminate\Validation;
 
 use Closure;
-use Illuminate\Database\ConnectionResolverInterface;
 use Illuminate\Support\Str;
+use Illuminate\Database\ConnectionResolverInterface;
 
-class DatabasePresenceVerifier implements DatabasePresenceVerifierInterface
+class DatabasePresenceVerifier implements PresenceVerifierInterface
 {
     /**
      * The database connection instance.
@@ -60,15 +60,15 @@ class DatabasePresenceVerifier implements DatabasePresenceVerifierInterface
      *
      * @param  string  $collection
      * @param  string  $column
-     * @param  array  $values
-     * @param  array  $extra
+     * @param  array   $values
+     * @param  array   $extra
      * @return int
      */
     public function getMultiCount($collection, $column, array $values, array $extra = [])
     {
         $query = $this->table($collection)->whereIn($column, $values);
 
-        return $this->addConditions($query, $extra)->distinct()->count($column);
+        return $this->addConditions($query, $extra)->count();
     }
 
     /**

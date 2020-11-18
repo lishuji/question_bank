@@ -2,14 +2,14 @@
 
 namespace Illuminate\Database\Schema\Grammars;
 
-use Doctrine\DBAL\Schema\AbstractSchemaManager as SchemaManager;
-use Doctrine\DBAL\Schema\Comparator;
-use Doctrine\DBAL\Schema\Table;
-use Doctrine\DBAL\Types\Type;
-use Illuminate\Database\Connection;
-use Illuminate\Database\Schema\Blueprint;
-use Illuminate\Support\Fluent;
 use RuntimeException;
+use Doctrine\DBAL\Types\Type;
+use Illuminate\Support\Fluent;
+use Doctrine\DBAL\Schema\Table;
+use Illuminate\Database\Connection;
+use Doctrine\DBAL\Schema\Comparator;
+use Illuminate\Database\Schema\Blueprint;
+use Doctrine\DBAL\Schema\AbstractSchemaManager as SchemaManager;
 
 class ChangeColumn
 {
@@ -19,7 +19,7 @@ class ChangeColumn
      * @param  \Illuminate\Database\Schema\Grammars\Grammar  $grammar
      * @param  \Illuminate\Database\Schema\Blueprint  $blueprint
      * @param  \Illuminate\Support\Fluent  $command
-     * @param  \Illuminate\Database\Connection  $connection
+     * @param  \Illuminate\Database\Connection $connection
      * @return array
      *
      * @throws \RuntimeException
@@ -28,21 +28,17 @@ class ChangeColumn
     {
         if (! $connection->isDoctrineAvailable()) {
             throw new RuntimeException(sprintf(
-                'Changing columns for table "%s" requires Doctrine DBAL. Please install the doctrine/dbal package.',
+                'Changing columns for table "%s" requires Doctrine DBAL; install "doctrine/dbal".',
                 $blueprint->getTable()
             ));
         }
 
-        $schema = $connection->getDoctrineSchemaManager();
-        $databasePlatform = $schema->getDatabasePlatform();
-        $databasePlatform->registerDoctrineTypeMapping('enum', 'string');
-
         $tableDiff = static::getChangedDiff(
-            $grammar, $blueprint, $schema
+            $grammar, $blueprint, $schema = $connection->getDoctrineSchemaManager()
         );
 
         if ($tableDiff !== false) {
-            return (array) $databasePlatform->getAlterTableSQL($tableDiff);
+            return (array) $schema->getDatabasePlatform()->getAlterTableSQL($tableDiff);
         }
 
         return [];
@@ -86,10 +82,7 @@ class ChangeColumn
                 if (! is_null($option = static::mapFluentOptionToDoctrine($key))) {
                     if (method_exists($column, $method = 'set'.ucfirst($option))) {
                         $column->{$method}(static::mapFluentValueToDoctrine($option, $value));
-                        continue;
                     }
-
-                    $column->setCustomSchemaOption($option, static::mapFluentValueToDoctrine($option, $value));
                 }
             }
         }
@@ -125,13 +118,6 @@ class ChangeColumn
             $options['length'] = static::calculateDoctrineTextLength($fluent['type']);
         }
 
-        if (static::doesntNeedCharacterOptions($fluent['type'])) {
-            $options['customSchemaOptions'] = [
-                'collation' => '',
-                'charset' => '',
-            ];
-        }
-
         return $options;
     }
 
@@ -159,9 +145,6 @@ class ChangeColumn
             case 'binary':
                 $type = 'blob';
                 break;
-            case 'uuid':
-                $type = 'guid';
-                break;
         }
 
         return Type::getType($type);
@@ -183,31 +166,6 @@ class ChangeColumn
             default:
                 return 255 + 1;
         }
-    }
-
-    /**
-     * Determine if the given type does not need character / collation options.
-     *
-     * @param  string  $type
-     * @return bool
-     */
-    protected static function doesntNeedCharacterOptions($type)
-    {
-        return in_array($type, [
-            'bigInteger',
-            'binary',
-            'boolean',
-            'date',
-            'decimal',
-            'double',
-            'float',
-            'integer',
-            'json',
-            'mediumInteger',
-            'smallInteger',
-            'time',
-            'tinyInteger',
-        ]);
     }
 
     /**
@@ -242,6 +200,6 @@ class ChangeColumn
      */
     protected static function mapFluentValueToDoctrine($option, $value)
     {
-        return $option === 'notnull' ? ! $value : $value;
+        return $option == 'notnull' ? ! $value : $value;
     }
 }

@@ -35,30 +35,28 @@ class AuthenticateSession
      */
     public function handle($request, Closure $next)
     {
-        if (! $request->hasSession() || ! $request->user()) {
+        if (! $request->user() || ! $request->session()) {
             return $next($request);
         }
 
-        if ($this->guard()->viaRemember()) {
-            $passwordHash = explode('|', $request->cookies->get($this->auth->getRecallerName()))[2] ?? null;
+        if ($this->auth->viaRemember()) {
+            $passwordHash = explode('|', $request->cookies->get($this->auth->getRecallerName()))[2];
 
-            if (! $passwordHash || $passwordHash != $request->user()->getAuthPassword()) {
+            if ($passwordHash != $request->user()->getAuthPassword()) {
                 $this->logout($request);
             }
         }
 
-        if (! $request->session()->has('password_hash_'.$this->auth->getDefaultDriver())) {
+        if (! $request->session()->has('password_hash')) {
             $this->storePasswordHashInSession($request);
         }
 
-        if ($request->session()->get('password_hash_'.$this->auth->getDefaultDriver()) !== $request->user()->getAuthPassword()) {
+        if ($request->session()->get('password_hash') !== $request->user()->getAuthPassword()) {
             $this->logout($request);
         }
 
         return tap($next($request), function () use ($request) {
-            if (! is_null($this->guard()->user())) {
-                $this->storePasswordHashInSession($request);
-            }
+            $this->storePasswordHashInSession($request);
         });
     }
 
@@ -75,7 +73,7 @@ class AuthenticateSession
         }
 
         $request->session()->put([
-            'password_hash_'.$this->auth->getDefaultDriver() => $request->user()->getAuthPassword(),
+            'password_hash' => $request->user()->getAuthPassword(),
         ]);
     }
 
@@ -89,20 +87,10 @@ class AuthenticateSession
      */
     protected function logout($request)
     {
-        $this->guard()->logoutCurrentDevice();
+        $this->auth->logout();
 
         $request->session()->flush();
 
-        throw new AuthenticationException('Unauthenticated.', [$this->auth->getDefaultDriver()]);
-    }
-
-    /**
-     * Get the guard instance that should be used by the middleware.
-     *
-     * @return \Illuminate\Contracts\Auth\Factory|\Illuminate\Contracts\Auth\Guard
-     */
-    protected function guard()
-    {
-        return $this->auth;
+        throw new AuthenticationException;
     }
 }

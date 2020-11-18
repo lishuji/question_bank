@@ -2,13 +2,7 @@
 
 namespace Illuminate\Support;
 
-use Closure;
 use Illuminate\Console\Application as Artisan;
-use Illuminate\Contracts\Foundation\CachesConfiguration;
-use Illuminate\Contracts\Foundation\CachesRoutes;
-use Illuminate\Contracts\Support\DeferrableProvider;
-use Illuminate\Database\Eloquent\Factory as ModelFactory;
-use Illuminate\View\Compilers\BladeCompiler;
 
 abstract class ServiceProvider
 {
@@ -20,18 +14,11 @@ abstract class ServiceProvider
     protected $app;
 
     /**
-     * All of the registered booting callbacks.
+     * Indicates if loading of the provider is deferred.
      *
-     * @var array
+     * @var bool
      */
-    protected $bootingCallbacks = [];
-
-    /**
-     * All of the registered booted callbacks.
-     *
-     * @var array
-     */
-    protected $bootedCallbacks = [];
+    protected $defer = false;
 
     /**
      * The paths that should be published.
@@ -59,62 +46,6 @@ abstract class ServiceProvider
     }
 
     /**
-     * Register any application services.
-     *
-     * @return void
-     */
-    public function register()
-    {
-        //
-    }
-
-    /**
-     * Register a booting callback to be run before the "boot" method is called.
-     *
-     * @param  \Closure  $callback
-     * @return void
-     */
-    public function booting(Closure $callback)
-    {
-        $this->bootingCallbacks[] = $callback;
-    }
-
-    /**
-     * Register a booted callback to be run after the "boot" method is called.
-     *
-     * @param  \Closure  $callback
-     * @return void
-     */
-    public function booted(Closure $callback)
-    {
-        $this->bootedCallbacks[] = $callback;
-    }
-
-    /**
-     * Call the registered booting callbacks.
-     *
-     * @return void
-     */
-    public function callBootingCallbacks()
-    {
-        foreach ($this->bootingCallbacks as $callback) {
-            $this->app->call($callback);
-        }
-    }
-
-    /**
-     * Call the registered booted callbacks.
-     *
-     * @return void
-     */
-    public function callBootedCallbacks()
-    {
-        foreach ($this->bootedCallbacks as $callback) {
-            $this->app->call($callback);
-        }
-    }
-
-    /**
      * Merge the given configuration with the existing configuration.
      *
      * @param  string  $path
@@ -123,13 +54,9 @@ abstract class ServiceProvider
      */
     protected function mergeConfigFrom($path, $key)
     {
-        if (! ($this->app instanceof CachesConfiguration && $this->app->configurationIsCached())) {
-            $config = $this->app->make('config');
+        $config = $this->app['config']->get($key, []);
 
-            $config->set($key, array_merge(
-                require $path, $config->get($key, [])
-            ));
-        }
+        $this->app['config']->set($key, array_merge(require $path, $config));
     }
 
     /**
@@ -140,7 +67,7 @@ abstract class ServiceProvider
      */
     protected function loadRoutesFrom($path)
     {
-        if (! ($this->app instanceof CachesRoutes && $this->app->routesAreCached())) {
+        if (! $this->app->routesAreCached()) {
             require $path;
         }
     }
@@ -154,34 +81,15 @@ abstract class ServiceProvider
      */
     protected function loadViewsFrom($path, $namespace)
     {
-        $this->callAfterResolving('view', function ($view) use ($path, $namespace) {
-            if (isset($this->app->config['view']['paths']) &&
-                is_array($this->app->config['view']['paths'])) {
-                foreach ($this->app->config['view']['paths'] as $viewPath) {
-                    if (is_dir($appPath = $viewPath.'/vendor/'.$namespace)) {
-                        $view->addNamespace($namespace, $appPath);
-                    }
+        if (is_array($this->app->config['view']['paths'])) {
+            foreach ($this->app->config['view']['paths'] as $viewPath) {
+                if (is_dir($appPath = $viewPath.'/vendor/'.$namespace)) {
+                    $this->app['view']->addNamespace($namespace, $appPath);
                 }
             }
+        }
 
-            $view->addNamespace($namespace, $path);
-        });
-    }
-
-    /**
-     * Register the given view components with a custom prefix.
-     *
-     * @param  string  $prefix
-     * @param  array  $components
-     * @return void
-     */
-    protected function loadViewComponentsAs($prefix, array $components)
-    {
-        $this->callAfterResolving(BladeCompiler::class, function ($blade) use ($prefix, $components) {
-            foreach ($components as $alias => $component) {
-                $blade->component($component, is_string($alias) ? $alias : null, $prefix);
-            }
-        });
+        $this->app['view']->addNamespace($namespace, $path);
     }
 
     /**
@@ -193,9 +101,7 @@ abstract class ServiceProvider
      */
     protected function loadTranslationsFrom($path, $namespace)
     {
-        $this->callAfterResolving('translator', function ($translator) use ($path, $namespace) {
-            $translator->addNamespace($namespace, $path);
-        });
+        $this->app['translator']->addNamespace($namespace, $path);
     }
 
     /**
@@ -206,20 +112,18 @@ abstract class ServiceProvider
      */
     protected function loadJsonTranslationsFrom($path)
     {
-        $this->callAfterResolving('translator', function ($translator) use ($path) {
-            $translator->addJsonPath($path);
-        });
+        $this->app['translator']->addJsonPath($path);
     }
 
     /**
-     * Register database migration paths.
+     * Register a database migration path.
      *
      * @param  array|string  $paths
      * @return void
      */
     protected function loadMigrationsFrom($paths)
     {
-        $this->callAfterResolving('migrator', function ($migrator) use ($paths) {
+        $this->app->afterResolving('migrator', function ($migrator) use ($paths) {
             foreach ((array) $paths as $path) {
                 $migrator->path($path);
             }
@@ -227,52 +131,19 @@ abstract class ServiceProvider
     }
 
     /**
-     * Register Eloquent model factory paths.
-     *
-     * @deprecated Will be removed in a future Laravel version.
-     *
-     * @param  array|string  $paths
-     * @return void
-     */
-    protected function loadFactoriesFrom($paths)
-    {
-        $this->callAfterResolving(ModelFactory::class, function ($factory) use ($paths) {
-            foreach ((array) $paths as $path) {
-                $factory->load($path);
-            }
-        });
-    }
-
-    /**
-     * Setup an after resolving listener, or fire immediately if already resolved.
-     *
-     * @param  string  $name
-     * @param  callable  $callback
-     * @return void
-     */
-    protected function callAfterResolving($name, $callback)
-    {
-        $this->app->afterResolving($name, $callback);
-
-        if ($this->app->resolved($name)) {
-            $callback($this->app->make($name), $this->app);
-        }
-    }
-
-    /**
      * Register paths to be published by the publish command.
      *
      * @param  array  $paths
-     * @param  mixed  $groups
+     * @param  string  $group
      * @return void
      */
-    protected function publishes(array $paths, $groups = null)
+    protected function publishes(array $paths, $group = null)
     {
         $this->ensurePublishArrayInitialized($class = static::class);
 
         static::$publishes[$class] = array_merge(static::$publishes[$class], $paths);
 
-        foreach ((array) $groups as $group) {
+        if ($group) {
             $this->addPublishGroup($group, $paths);
         }
     }
@@ -311,8 +182,8 @@ abstract class ServiceProvider
     /**
      * Get the paths to publish.
      *
-     * @param  string|null  $provider
-     * @param  string|null  $group
+     * @param  string  $provider
+     * @param  string  $group
      * @return array
      */
     public static function pathsToPublish($provider = null, $group = null)
@@ -424,6 +295,6 @@ abstract class ServiceProvider
      */
     public function isDeferred()
     {
-        return $this instanceof DeferrableProvider;
+        return $this->defer;
     }
 }

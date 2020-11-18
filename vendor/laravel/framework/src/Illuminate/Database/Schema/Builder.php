@@ -3,11 +3,8 @@
 namespace Illuminate\Database\Schema;
 
 use Closure;
-use Doctrine\DBAL\Types\Type;
-use Illuminate\Database\Connection;
-use InvalidArgumentException;
 use LogicException;
-use RuntimeException;
+use Illuminate\Database\Connection;
 
 class Builder
 {
@@ -40,13 +37,6 @@ class Builder
     public static $defaultStringLength = 255;
 
     /**
-     * The default relationship morph key type.
-     *
-     * @var string
-     */
-    public static $defaultMorphKeyType = 'int';
-
-    /**
      * Create a new database Schema manager.
      *
      * @param  \Illuminate\Database\Connection  $connection
@@ -67,31 +57,6 @@ class Builder
     public static function defaultStringLength($length)
     {
         static::$defaultStringLength = $length;
-    }
-
-    /**
-     * Set the default morph key type for migrations.
-     *
-     * @param  string  $type
-     * @return void
-     */
-    public static function defaultMorphKeyType(string $type)
-    {
-        if (! in_array($type, ['int', 'uuid'])) {
-            throw new InvalidArgumentException("Morph key type must be 'int' or 'uuid'.");
-        }
-
-        static::$defaultMorphKeyType = $type;
-    }
-
-    /**
-     * Set the default morph key type for migrations to UUIDs.
-     *
-     * @return void
-     */
-    public static function morphUsingUuids()
-    {
-        return static::defaultMorphKeyType('uuid');
     }
 
     /**
@@ -127,7 +92,7 @@ class Builder
      * Determine if the given table has given columns.
      *
      * @param  string  $table
-     * @param  array  $columns
+     * @param  array   $columns
      * @return bool
      */
     public function hasColumns($table, array $columns)
@@ -175,7 +140,7 @@ class Builder
     /**
      * Modify a table on the schema.
      *
-     * @param  string  $table
+     * @param  string    $table
      * @param  \Closure  $callback
      * @return void
      */
@@ -187,7 +152,7 @@ class Builder
     /**
      * Create a new table on the schema.
      *
-     * @param  string  $table
+     * @param  string    $table
      * @param  \Closure  $callback
      * @return void
      */
@@ -227,20 +192,6 @@ class Builder
     }
 
     /**
-     * Drop columns from a table schema.
-     *
-     * @param  string  $table
-     * @param  string|array  $columns
-     * @return void
-     */
-    public function dropColumns($table, $columns)
-    {
-        $this->table($table, function (Blueprint $blueprint) use ($columns) {
-            $blueprint->dropColumn($columns);
-        });
-    }
-
-    /**
      * Drop all tables from the database.
      *
      * @return void
@@ -262,30 +213,6 @@ class Builder
     public function dropAllViews()
     {
         throw new LogicException('This database driver does not support dropping all views.');
-    }
-
-    /**
-     * Drop all types from the database.
-     *
-     * @return void
-     *
-     * @throws \LogicException
-     */
-    public function dropAllTypes()
-    {
-        throw new LogicException('This database driver does not support dropping all types.');
-    }
-
-    /**
-     * Get all of the table names for the database.
-     *
-     * @return void
-     *
-     * @throws \LogicException
-     */
-    public function getAllTables()
-    {
-        throw new LogicException('This database driver does not support getting all tables.');
     }
 
     /**
@@ -346,44 +273,11 @@ class Builder
      */
     protected function createBlueprint($table, Closure $callback = null)
     {
-        $prefix = $this->connection->getConfig('prefix_indexes')
-                    ? $this->connection->getConfig('prefix')
-                    : '';
-
         if (isset($this->resolver)) {
-            return call_user_func($this->resolver, $table, $callback, $prefix);
+            return call_user_func($this->resolver, $table, $callback);
         }
 
-        return new Blueprint($table, $callback, $prefix);
-    }
-
-    /**
-     * Register a custom Doctrine mapping type.
-     *
-     * @param  string  $class
-     * @param  string  $name
-     * @param  string  $type
-     * @return void
-     *
-     * @throws \Doctrine\DBAL\DBALException
-     * @throws \RuntimeException
-     */
-    public function registerCustomDoctrineType($class, $name, $type)
-    {
-        if (! $this->connection->isDoctrineAvailable()) {
-            throw new RuntimeException(
-                'Registering a custom Doctrine type requires Doctrine DBAL (doctrine/dbal).'
-            );
-        }
-
-        if (! Type::hasType($name)) {
-            Type::addType($name, $class);
-
-            $this->connection
-                ->getDoctrineSchemaManager()
-                ->getDatabasePlatform()
-                ->registerDoctrineTypeMapping($type, $name);
-        }
+        return new Blueprint($table, $callback);
     }
 
     /**

@@ -18,25 +18,13 @@ class SessionManager extends Manager
     }
 
     /**
-     * Create an instance of the "null" session driver.
-     *
-     * @return \Illuminate\Session\Store
-     */
-    protected function createNullDriver()
-    {
-        return $this->buildSession(new NullSessionHandler);
-    }
-
-    /**
      * Create an instance of the "array" session driver.
      *
      * @return \Illuminate\Session\Store
      */
     protected function createArrayDriver()
     {
-        return $this->buildSession(new ArraySessionHandler(
-            $this->config->get('session.lifetime')
-        ));
+        return $this->buildSession(new NullSessionHandler);
     }
 
     /**
@@ -47,7 +35,7 @@ class SessionManager extends Manager
     protected function createCookieDriver()
     {
         return $this->buildSession(new CookieSessionHandler(
-            $this->container->make('cookie'), $this->config->get('session.lifetime')
+            $this->app['cookie'], $this->app['config']['session.lifetime']
         ));
     }
 
@@ -68,10 +56,10 @@ class SessionManager extends Manager
      */
     protected function createNativeDriver()
     {
-        $lifetime = $this->config->get('session.lifetime');
+        $lifetime = $this->app['config']['session.lifetime'];
 
         return $this->buildSession(new FileSessionHandler(
-            $this->container->make('files'), $this->config->get('session.files'), $lifetime
+            $this->app['files'], $this->app['config']['session.files'], $lifetime
         ));
     }
 
@@ -82,12 +70,12 @@ class SessionManager extends Manager
      */
     protected function createDatabaseDriver()
     {
-        $table = $this->config->get('session.table');
+        $table = $this->app['config']['session.table'];
 
-        $lifetime = $this->config->get('session.lifetime');
+        $lifetime = $this->app['config']['session.lifetime'];
 
         return $this->buildSession(new DatabaseSessionHandler(
-            $this->getDatabaseConnection(), $table, $lifetime, $this->container
+            $this->getDatabaseConnection(), $table, $lifetime, $this->app
         ));
     }
 
@@ -98,9 +86,9 @@ class SessionManager extends Manager
      */
     protected function getDatabaseConnection()
     {
-        $connection = $this->config->get('session.connection');
+        $connection = $this->app['config']['session.connection'];
 
-        return $this->container->make('db')->connection($connection);
+        return $this->app['db']->connection($connection);
     }
 
     /**
@@ -133,20 +121,10 @@ class SessionManager extends Manager
         $handler = $this->createCacheHandler('redis');
 
         $handler->getCache()->getStore()->setConnection(
-            $this->config->get('session.connection')
+            $this->app['config']['session.connection']
         );
 
         return $this->buildSession($handler);
-    }
-
-    /**
-     * Create an instance of the DynamoDB session driver.
-     *
-     * @return \Illuminate\Session\Store
-     */
-    protected function createDynamodbDriver()
-    {
-        return $this->createCacheBased('dynamodb');
     }
 
     /**
@@ -168,11 +146,11 @@ class SessionManager extends Manager
      */
     protected function createCacheHandler($driver)
     {
-        $store = $this->config->get('session.store') ?: $driver;
+        $store = $this->app['config']->get('session.store') ?: $driver;
 
         return new CacheBasedSessionHandler(
-            clone $this->container->make('cache')->store($store),
-            $this->config->get('session.lifetime')
+            clone $this->app['cache']->store($store),
+            $this->app['config']['session.lifetime']
         );
     }
 
@@ -184,9 +162,11 @@ class SessionManager extends Manager
      */
     protected function buildSession($handler)
     {
-        return $this->config->get('session.encrypt')
-                ? $this->buildEncryptedSession($handler)
-                : new Store($this->config->get('session.cookie'), $handler);
+        if ($this->app['config']['session.encrypt']) {
+            return $this->buildEncryptedSession($handler);
+        }
+
+        return new Store($this->app['config']['session.cookie'], $handler);
     }
 
     /**
@@ -198,28 +178,8 @@ class SessionManager extends Manager
     protected function buildEncryptedSession($handler)
     {
         return new EncryptedStore(
-            $this->config->get('session.cookie'), $handler, $this->container['encrypter']
+            $this->app['config']['session.cookie'], $handler, $this->app['encrypter']
         );
-    }
-
-    /**
-     * Determine if requests for the same session should wait for each to finish before executing.
-     *
-     * @return bool
-     */
-    public function shouldBlock()
-    {
-        return $this->config->get('session.block', false);
-    }
-
-    /**
-     * Get the name of the cache store / driver that should be used to acquire session locks.
-     *
-     * @return string|null
-     */
-    public function blockDriver()
-    {
-        return $this->config->get('session.block_store');
     }
 
     /**
@@ -229,7 +189,7 @@ class SessionManager extends Manager
      */
     public function getSessionConfig()
     {
-        return $this->config->get('session');
+        return $this->app['config']['session'];
     }
 
     /**
@@ -239,7 +199,7 @@ class SessionManager extends Manager
      */
     public function getDefaultDriver()
     {
-        return $this->config->get('session.driver');
+        return $this->app['config']['session.driver'];
     }
 
     /**
@@ -250,6 +210,6 @@ class SessionManager extends Manager
      */
     public function setDefaultDriver($name)
     {
-        $this->config->set('session.driver', $name);
+        $this->app['config']['session.driver'] = $name;
     }
 }

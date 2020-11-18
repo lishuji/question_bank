@@ -1,20 +1,27 @@
 <?php
 
-declare(strict_types=1);
+/**
+ * This file is part of Collision.
+ *
+ * (c) Nuno Maduro <enunomaduro@gmail.com>
+ *
+ *  For the full copyright and license information, please view the LICENSE
+ *  file that was distributed with this source code.
+ */
 
 namespace NunoMaduro\Collision;
 
-use NunoMaduro\Collision\Contracts\Handler as HandlerContract;
-use NunoMaduro\Collision\Contracts\Writer as WriterContract;
-use Symfony\Component\Console\Output\OutputInterface;
 use Whoops\Handler\Handler as AbstractHandler;
+use Symfony\Component\Console\Output\OutputInterface;
+use NunoMaduro\Collision\Contracts\Writer as WriterContract;
+use NunoMaduro\Collision\Contracts\Handler as HandlerContract;
 
 /**
- * @internal
+ * This is an Collision Handler implementation.
  *
- * @see \Tests\Unit\HandlerTest
+ * @author Nuno Maduro <enunomaduro@gmail.com>
  */
-final class Handler extends AbstractHandler implements HandlerContract
+class Handler extends AbstractHandler implements HandlerContract
 {
     /**
      * Holds an instance of the writer.
@@ -25,10 +32,12 @@ final class Handler extends AbstractHandler implements HandlerContract
 
     /**
      * Creates an instance of the Handler.
+     *
+     * @param \NunoMaduro\Collision\Contracts\Writer|null $writer
      */
     public function __construct(WriterContract $writer = null)
     {
-        $this->writer = $writer ?: new Writer();
+        $this->writer = $writer ?: new Writer;
     }
 
     /**

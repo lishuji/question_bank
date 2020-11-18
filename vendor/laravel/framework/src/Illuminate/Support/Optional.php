@@ -4,11 +4,10 @@ namespace Illuminate\Support;
 
 use ArrayAccess;
 use ArrayObject;
-use Illuminate\Support\Traits\Macroable;
 
 class Optional implements ArrayAccess
 {
-    use Macroable {
+    use Traits\Macroable {
         __call as macroCall;
     }
 
@@ -46,7 +45,7 @@ class Optional implements ArrayAccess
     /**
      * Dynamically check a property exists on the underlying object.
      *
-     * @param  mixed  $name
+     * @param $name
      * @return bool
      */
     public function __isset($name)

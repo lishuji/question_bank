@@ -3,7 +3,7 @@
 /*
  * This file is part of Psy Shell.
  *
- * (c) 2012-2020 Justin Hileman
+ * (c) 2012-2018 Justin Hileman
  *
  * For the full copyright and license information, please view the LICENSE
  * file that was distributed with this source code.
@@ -15,7 +15,6 @@ use PhpParser\Node;
 use PhpParser\Node\Expr\Exit_;
 use PhpParser\Node\Expr\StaticCall;
 use PhpParser\Node\Name\FullyQualified as FullyQualifiedName;
-use Psy\Exception\BreakException;
 
 class ExitPass extends CodeCleanerPass
 {
@@ -27,7 +26,7 @@ class ExitPass extends CodeCleanerPass
     public function leaveNode(Node $node)
     {
         if ($node instanceof Exit_) {
-            return new StaticCall(new FullyQualifiedName(BreakException::class), 'exitShell');
+            return new StaticCall(new FullyQualifiedName('Psy\Exception\BreakException'), 'exitShell');
         }
     }
 }

@@ -1,8 +1,8 @@
 <?php
 
-use Illuminate\Support\Facades\Route;
-use \App\Http\Controllers\ManagerController;
-
+use Illuminate\Routing\Route;
+use Illuminate\Support\Facades\Auth;
+use App\Http\Controllers\Admin\AdminController;
 /*
 |--------------------------------------------------------------------------
 | Web Routes
@@ -18,11 +18,8 @@ Route::get('/', function () {
     return view('welcome');
 });
 
+//Auth::routes();
 
-Route::prefix('admin')->group(function () {
+Route::get('/home', 'HomeController@index')->name('home');
 
-    Route::get('manager/login', [ManagerController::class, 'login']);
-    Route::get('manager/get_user_info', [ManagerController::class, 'getUserInfo']);
-
-
-});
+Route::post('/login', 'AdminController@login');

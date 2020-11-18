@@ -2,23 +2,21 @@
 
 namespace Illuminate\Database\Eloquent\Concerns;
 
-use Closure;
-use Illuminate\Database\Eloquent\Builder;
-use Illuminate\Database\Eloquent\Collection;
-use Illuminate\Database\Eloquent\Model;
-use Illuminate\Database\Eloquent\Relations\BelongsTo;
-use Illuminate\Database\Eloquent\Relations\BelongsToMany;
-use Illuminate\Database\Eloquent\Relations\HasMany;
-use Illuminate\Database\Eloquent\Relations\HasManyThrough;
-use Illuminate\Database\Eloquent\Relations\HasOne;
-use Illuminate\Database\Eloquent\Relations\HasOneThrough;
-use Illuminate\Database\Eloquent\Relations\MorphMany;
-use Illuminate\Database\Eloquent\Relations\MorphOne;
-use Illuminate\Database\Eloquent\Relations\MorphTo;
-use Illuminate\Database\Eloquent\Relations\MorphToMany;
-use Illuminate\Database\Eloquent\Relations\Relation;
 use Illuminate\Support\Arr;
 use Illuminate\Support\Str;
+use Illuminate\Database\Eloquent\Model;
+use Illuminate\Database\Eloquent\Builder;
+use Illuminate\Database\Eloquent\Collection;
+use Illuminate\Database\Eloquent\Relations\HasOne;
+use Illuminate\Database\Eloquent\Relations\HasMany;
+use Illuminate\Database\Eloquent\Relations\MorphTo;
+use Illuminate\Database\Eloquent\Relations\MorphOne;
+use Illuminate\Database\Eloquent\Relations\Relation;
+use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use Illuminate\Database\Eloquent\Relations\MorphMany;
+use Illuminate\Database\Eloquent\Relations\MorphToMany;
+use Illuminate\Database\Eloquent\Relations\BelongsToMany;
+use Illuminate\Database\Eloquent\Relations\HasManyThrough;
 
 trait HasRelationships
 {
@@ -39,40 +37,19 @@ trait HasRelationships
     /**
      * The many to many relationship methods.
      *
-     * @var string[]
+     * @var array
      */
     public static $manyMethods = [
         'belongsToMany', 'morphToMany', 'morphedByMany',
+        'guessBelongsToManyRelation', 'findFirstMethodThatIsntRelation',
     ];
-
-    /**
-     * The relation resolver callbacks.
-     *
-     * @var array
-     */
-    protected static $relationResolvers = [];
-
-    /**
-     * Define a dynamic relation resolver.
-     *
-     * @param  string  $name
-     * @param  \Closure  $callback
-     * @return void
-     */
-    public static function resolveRelationUsing($name, Closure $callback)
-    {
-        static::$relationResolvers = array_replace_recursive(
-            static::$relationResolvers,
-            [static::class => [$name => $callback]]
-        );
-    }
 
     /**
      * Define a one-to-one relationship.
      *
      * @param  string  $related
-     * @param  string|null  $foreignKey
-     * @param  string|null  $localKey
+     * @param  string  $foreignKey
+     * @param  string  $localKey
      * @return \Illuminate\Database\Eloquent\Relations\HasOne
      */
     public function hasOne($related, $foreignKey = null, $localKey = null)
@@ -101,56 +78,13 @@ trait HasRelationships
     }
 
     /**
-     * Define a has-one-through relationship.
-     *
-     * @param  string  $related
-     * @param  string  $through
-     * @param  string|null  $firstKey
-     * @param  string|null  $secondKey
-     * @param  string|null  $localKey
-     * @param  string|null  $secondLocalKey
-     * @return \Illuminate\Database\Eloquent\Relations\HasOneThrough
-     */
-    public function hasOneThrough($related, $through, $firstKey = null, $secondKey = null, $localKey = null, $secondLocalKey = null)
-    {
-        $through = new $through;
-
-        $firstKey = $firstKey ?: $this->getForeignKey();
-
-        $secondKey = $secondKey ?: $through->getForeignKey();
-
-        return $this->newHasOneThrough(
-            $this->newRelatedInstance($related)->newQuery(), $this, $through,
-            $firstKey, $secondKey, $localKey ?: $this->getKeyName(),
-            $secondLocalKey ?: $through->getKeyName()
-        );
-    }
-
-    /**
-     * Instantiate a new HasOneThrough relationship.
-     *
-     * @param  \Illuminate\Database\Eloquent\Builder  $query
-     * @param  \Illuminate\Database\Eloquent\Model  $farParent
-     * @param  \Illuminate\Database\Eloquent\Model  $throughParent
-     * @param  string  $firstKey
-     * @param  string  $secondKey
-     * @param  string  $localKey
-     * @param  string  $secondLocalKey
-     * @return \Illuminate\Database\Eloquent\Relations\HasOneThrough
-     */
-    protected function newHasOneThrough(Builder $query, Model $farParent, Model $throughParent, $firstKey, $secondKey, $localKey, $secondLocalKey)
-    {
-        return new HasOneThrough($query, $farParent, $throughParent, $firstKey, $secondKey, $localKey, $secondLocalKey);
-    }
-
-    /**
      * Define a polymorphic one-to-one relationship.
      *
      * @param  string  $related
      * @param  string  $name
-     * @param  string|null  $type
-     * @param  string|null  $id
-     * @param  string|null  $localKey
+     * @param  string  $type
+     * @param  string  $id
+     * @param  string  $localKey
      * @return \Illuminate\Database\Eloquent\Relations\MorphOne
      */
     public function morphOne($related, $name, $type = null, $id = null, $localKey = null)
@@ -185,9 +119,9 @@ trait HasRelationships
      * Define an inverse one-to-one or many relationship.
      *
      * @param  string  $related
-     * @param  string|null  $foreignKey
-     * @param  string|null  $ownerKey
-     * @param  string|null  $relation
+     * @param  string  $foreignKey
+     * @param  string  $ownerKey
+     * @param  string  $relation
      * @return \Illuminate\Database\Eloquent\Relations\BelongsTo
      */
     public function belongsTo($related, $foreignKey = null, $ownerKey = null, $relation = null)
@@ -236,10 +170,10 @@ trait HasRelationships
     /**
      * Define a polymorphic, inverse one-to-one or many relationship.
      *
-     * @param  string|null  $name
-     * @param  string|null  $type
-     * @param  string|null  $id
-     * @param  string|null  $ownerKey
+     * @param  string  $name
+     * @param  string  $type
+     * @param  string  $id
+     * @param  string  $ownerKey
      * @return \Illuminate\Database\Eloquent\Relations\MorphTo
      */
     public function morphTo($name = null, $type = null, $id = null, $ownerKey = null)
@@ -341,8 +275,8 @@ trait HasRelationships
      * Define a one-to-many relationship.
      *
      * @param  string  $related
-     * @param  string|null  $foreignKey
-     * @param  string|null  $localKey
+     * @param  string  $foreignKey
+     * @param  string  $localKey
      * @return \Illuminate\Database\Eloquent\Relations\HasMany
      */
     public function hasMany($related, $foreignKey = null, $localKey = null)
@@ -392,12 +326,8 @@ trait HasRelationships
         $secondKey = $secondKey ?: $through->getForeignKey();
 
         return $this->newHasManyThrough(
-            $this->newRelatedInstance($related)->newQuery(),
-            $this,
-            $through,
-            $firstKey,
-            $secondKey,
-            $localKey ?: $this->getKeyName(),
+            $this->newRelatedInstance($related)->newQuery(), $this, $through,
+            $firstKey, $secondKey, $localKey ?: $this->getKeyName(),
             $secondLocalKey ?: $through->getKeyName()
         );
     }
@@ -424,9 +354,9 @@ trait HasRelationships
      *
      * @param  string  $related
      * @param  string  $name
-     * @param  string|null  $type
-     * @param  string|null  $id
-     * @param  string|null  $localKey
+     * @param  string  $type
+     * @param  string  $id
+     * @param  string  $localKey
      * @return \Illuminate\Database\Eloquent\Relations\MorphMany
      */
     public function morphMany($related, $name, $type = null, $id = null, $localKey = null)
@@ -464,12 +394,12 @@ trait HasRelationships
      * Define a many-to-many relationship.
      *
      * @param  string  $related
-     * @param  string|null  $table
-     * @param  string|null  $foreignPivotKey
-     * @param  string|null  $relatedPivotKey
-     * @param  string|null  $parentKey
-     * @param  string|null  $relatedKey
-     * @param  string|null  $relation
+     * @param  string  $table
+     * @param  string  $foreignPivotKey
+     * @param  string  $relatedPivotKey
+     * @param  string  $parentKey
+     * @param  string  $relatedKey
+     * @param  string  $relation
      * @return \Illuminate\Database\Eloquent\Relations\BelongsToMany
      */
     public function belongsToMany($related, $table = null, $foreignPivotKey = null, $relatedPivotKey = null,
@@ -495,7 +425,7 @@ trait HasRelationships
         // models using underscores in alphabetical order. The two model names
         // are transformed to snake case from their default CamelCase also.
         if (is_null($table)) {
-            $table = $this->joiningTable($related, $instance);
+            $table = $this->joiningTable($related);
         }
 
         return $this->newBelongsToMany(
@@ -515,7 +445,7 @@ trait HasRelationships
      * @param  string  $relatedPivotKey
      * @param  string  $parentKey
      * @param  string  $relatedKey
-     * @param  string|null  $relationName
+     * @param  string  $relationName
      * @return \Illuminate\Database\Eloquent\Relations\BelongsToMany
      */
     protected function newBelongsToMany(Builder $query, Model $parent, $table, $foreignPivotKey, $relatedPivotKey,
@@ -529,11 +459,11 @@ trait HasRelationships
      *
      * @param  string  $related
      * @param  string  $name
-     * @param  string|null  $table
-     * @param  string|null  $foreignPivotKey
-     * @param  string|null  $relatedPivotKey
-     * @param  string|null  $parentKey
-     * @param  string|null  $relatedKey
+     * @param  string  $table
+     * @param  string  $foreignPivotKey
+     * @param  string  $relatedPivotKey
+     * @param  string  $parentKey
+     * @param  string  $relatedKey
      * @param  bool  $inverse
      * @return \Illuminate\Database\Eloquent\Relations\MorphToMany
      */
@@ -555,13 +485,7 @@ trait HasRelationships
         // Now we're ready to create a new query builder for this related model and
         // the relationship instances for this relation. This relations will set
         // appropriate query constraints then entirely manages the hydrations.
-        if (! $table) {
-            $words = preg_split('/(_)/u', $name, -1, PREG_SPLIT_DELIM_CAPTURE);
-
-            $lastWord = array_pop($words);
-
-            $table = implode('', $words).Str::plural($lastWord);
-        }
+        $table = $table ?: Str::plural($name);
 
         return $this->newMorphToMany(
             $instance->newQuery(), $this, $name, $table,
@@ -581,7 +505,7 @@ trait HasRelationships
      * @param  string  $relatedPivotKey
      * @param  string  $parentKey
      * @param  string  $relatedKey
-     * @param  string|null  $relationName
+     * @param  string  $relationName
      * @param  bool  $inverse
      * @return \Illuminate\Database\Eloquent\Relations\MorphToMany
      */
@@ -598,11 +522,11 @@ trait HasRelationships
      *
      * @param  string  $related
      * @param  string  $name
-     * @param  string|null  $table
-     * @param  string|null  $foreignPivotKey
-     * @param  string|null  $relatedPivotKey
-     * @param  string|null  $parentKey
-     * @param  string|null  $relatedKey
+     * @param  string  $table
+     * @param  string  $foreignPivotKey
+     * @param  string  $relatedPivotKey
+     * @param  string  $parentKey
+     * @param  string  $relatedKey
      * @return \Illuminate\Database\Eloquent\Relations\MorphToMany
      */
     public function morphedByMany($related, $name, $table = null, $foreignPivotKey = null,
@@ -622,17 +546,14 @@ trait HasRelationships
     }
 
     /**
-     * Get the relationship name of the belongsToMany relationship.
+     * Get the relationship name of the belongs to many.
      *
-     * @return string|null
+     * @return string
      */
     protected function guessBelongsToManyRelation()
     {
         $caller = Arr::first(debug_backtrace(DEBUG_BACKTRACE_IGNORE_ARGS), function ($trace) {
-            return ! in_array(
-                $trace['function'],
-                array_merge(static::$manyMethods, ['guessBelongsToManyRelation'])
-            );
+            return ! in_array($trace['function'], Model::$manyMethods);
         });
 
         return ! is_null($caller) ? $caller['function'] : null;
@@ -642,36 +563,24 @@ trait HasRelationships
      * Get the joining table name for a many-to-many relation.
      *
      * @param  string  $related
-     * @param  \Illuminate\Database\Eloquent\Model|null  $instance
      * @return string
      */
-    public function joiningTable($related, $instance = null)
+    public function joiningTable($related)
     {
         // The joining table name, by convention, is simply the snake cased models
         // sorted alphabetically and concatenated with an underscore, so we can
         // just sort the models and join them together to get the table name.
-        $segments = [
-            $instance ? $instance->joiningTableSegment()
-                      : Str::snake(class_basename($related)),
-            $this->joiningTableSegment(),
+        $models = [
+            Str::snake(class_basename($related)),
+            Str::snake(class_basename($this)),
         ];
 
         // Now that we have the model names in an array we can just sort them and
         // use the implode function to join them together with an underscores,
         // which is typically used by convention within the database system.
-        sort($segments);
+        sort($models);
 
-        return strtolower(implode('_', $segments));
-    }
-
-    /**
-     * Get this model's half of the intermediate table name for belongsToMany relationships.
-     *
-     * @return string
-     */
-    public function joiningTableSegment()
-    {
-        return Str::snake(class_basename($this));
+        return strtolower(implode('_', $models));
     }
 
     /**
@@ -682,7 +591,7 @@ trait HasRelationships
      */
     public function touches($relation)
     {
-        return in_array($relation, $this->getTouchedRelations());
+        return in_array($relation, $this->touches);
     }
 
     /**
@@ -692,7 +601,7 @@ trait HasRelationships
      */
     public function touchOwners()
     {
-        foreach ($this->getTouchedRelations() as $relation) {
+        foreach ($this->touches as $relation) {
             $this->$relation()->touch();
 
             if ($this->$relation instanceof self) {
@@ -700,7 +609,9 @@ trait HasRelationships
 
                 $this->$relation->touchOwners();
             } elseif ($this->$relation instanceof Collection) {
-                $this->$relation->each->touchOwners();
+                $this->$relation->each(function (Model $relation) {
+                    $relation->touchOwners();
+                });
             }
         }
     }
@@ -817,30 +728,6 @@ trait HasRelationships
     public function setRelations(array $relations)
     {
         $this->relations = $relations;
-
-        return $this;
-    }
-
-    /**
-     * Duplicate the instance and unset all the loaded relations.
-     *
-     * @return $this
-     */
-    public function withoutRelations()
-    {
-        $model = clone $this;
-
-        return $model->unsetRelations();
-    }
-
-    /**
-     * Unset all the loaded relations for the instance.
-     *
-     * @return $this
-     */
-    public function unsetRelations()
-    {
-        $this->relations = [];
 
         return $this;
     }

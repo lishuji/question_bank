@@ -3,7 +3,7 @@
 /*
  * This file is part of Psy Shell.
  *
- * (c) 2012-2020 Justin Hileman
+ * (c) 2012-2018 Justin Hileman
  *
  * For the full copyright and license information, please view the LICENSE
  * file that was distributed with this source code.
@@ -11,7 +11,6 @@
 
 namespace Psy;
 
-use Psy\Exception\ErrorException;
 use XdgBaseDir\Xdg;
 
 /**
@@ -137,7 +136,7 @@ class ConfigPaths
     {
         $xdg = new Xdg();
 
-        \set_error_handler([ErrorException::class, 'throwException']);
+        \set_error_handler(['Psy\Exception\ErrorException', 'throwException']);
 
         try {
             // XDG doesn't really work on Windows, sometimes complains about
@@ -162,18 +161,18 @@ class ConfigPaths
         }, $baseDirs);
 
         // Add ~/.psysh
-        if (isset($_SERVER['HOME']) && $_SERVER['HOME']) {
-            $dirs[] = \strtr($_SERVER['HOME'], '\\', '/') . '/.psysh';
+        if ($home = \getenv('HOME')) {
+            $dirs[] = \strtr($home, '\\', '/') . '/.psysh';
         }
 
         // Add some Windows specific ones :)
         if (\defined('PHP_WINDOWS_VERSION_MAJOR')) {
-            if (isset($_SERVER['APPDATA']) && $_SERVER['APPDATA']) {
+            if ($appData = \getenv('APPDATA')) {
                 // AppData gets preference
-                \array_unshift($dirs, \strtr($_SERVER['APPDATA'], '\\', '/') . '/PsySH');
+                \array_unshift($dirs, \strtr($appData, '\\', '/') . '/PsySH');
             }
 
-            $dir = \strtr($_SERVER['HOMEDRIVE'] . '/' . $_SERVER['HOMEPATH'], '\\', '/') . '/.psysh';
+            $dir = \strtr(\getenv('HOMEDRIVE') . '/' . \getenv('HOMEPATH'), '\\', '/') . '/.psysh';
             if (!\in_array($dir, $dirs)) {
                 $dirs[] = $dir;
             }
@@ -198,31 +197,6 @@ class ConfigPaths
     }
 
     /**
-     * Ensure that $dir exists and is writable.
-     *
-     * Generates E_USER_NOTICE error if the directory is not writable or creatable.
-     *
-     * @param string $dir
-     *
-     * @return bool False if directory exists but is not writeable, or cannot be created
-     */
-    public static function ensureDir($dir)
-    {
-        if (!\is_dir($dir)) {
-            // Just try making it and see if it works
-            @\mkdir($dir, 0700, true);
-        }
-
-        if (!\is_dir($dir) || !\is_writable($dir)) {
-            \trigger_error(\sprintf('Writing to %s is not allowed.', $dir), E_USER_NOTICE);
-
-            return false;
-        }
-
-        return true;
-    }
-
-    /**
      * Ensure that $file exists and is writable, make the parent directory if necessary.
      *
      * Generates E_USER_NOTICE error if either $file or its directory is not writable.
@@ -243,7 +217,16 @@ class ConfigPaths
             return false;
         }
 
-        if (!self::ensureDir(\dirname($file))) {
+        $dir = \dirname($file);
+
+        if (!\is_dir($dir)) {
+            // Just try making it and see if it works
+            @\mkdir($dir, 0700, true);
+        }
+
+        if (!\is_dir($dir) || !\is_writable($dir)) {
+            \trigger_error(\sprintf('Writing to %s is not allowed.', $dir), E_USER_NOTICE);
+
             return false;
         }
 

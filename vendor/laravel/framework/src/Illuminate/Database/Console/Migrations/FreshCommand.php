@@ -4,8 +4,6 @@ namespace Illuminate\Database\Console\Migrations;
 
 use Illuminate\Console\Command;
 use Illuminate\Console\ConfirmableTrait;
-use Illuminate\Contracts\Events\Dispatcher;
-use Illuminate\Database\Events\DatabaseRefreshed;
 use Symfony\Component\Console\Input\InputOption;
 
 class FreshCommand extends Command
@@ -29,43 +27,62 @@ class FreshCommand extends Command
     /**
      * Execute the console command.
      *
-     * @return int
+     * @return void
      */
     public function handle()
     {
         if (! $this->confirmToProceed()) {
-            return 1;
+            return;
         }
 
         $database = $this->input->getOption('database');
 
-        $this->call('db:wipe', array_filter([
-            '--database' => $database,
-            '--drop-views' => $this->option('drop-views'),
-            '--drop-types' => $this->option('drop-types'),
-            '--force' => true,
-        ]));
+        if ($this->option('drop-views')) {
+            $this->dropAllViews($database);
 
-        $this->call('migrate', array_filter([
+            $this->info('Dropped all views successfully.');
+        }
+
+        $this->dropAllTables($database);
+
+        $this->info('Dropped all tables successfully.');
+
+        $this->call('migrate', [
             '--database' => $database,
             '--path' => $this->input->getOption('path'),
             '--realpath' => $this->input->getOption('realpath'),
-            '--schema-path' => $this->input->getOption('schema-path'),
             '--force' => true,
-            '--step' => $this->option('step'),
-        ]));
+        ]);
 
         if ($this->needsSeeding()) {
             $this->runSeeder($database);
         }
+    }
 
-        if ($this->laravel->bound(Dispatcher::class)) {
-            $this->laravel[Dispatcher::class]->dispatch(
-                new DatabaseRefreshed
-            );
-        }
+    /**
+     * Drop all of the database tables.
+     *
+     * @param  string  $database
+     * @return void
+     */
+    protected function dropAllTables($database)
+    {
+        $this->laravel['db']->connection($database)
+                    ->getSchemaBuilder()
+                    ->dropAllTables();
+    }
 
-        return 0;
+    /**
+     * Drop all of the database views.
+     *
+     * @param  string  $database
+     * @return void
+     */
+    protected function dropAllViews($database)
+    {
+        $this->laravel['db']->connection($database)
+                    ->getSchemaBuilder()
+                    ->dropAllViews();
     }
 
     /**
@@ -86,11 +103,11 @@ class FreshCommand extends Command
      */
     protected function runSeeder($database)
     {
-        $this->call('db:seed', array_filter([
+        $this->call('db:seed', [
             '--database' => $database,
-            '--class' => $this->option('seeder') ?: 'Database\\Seeders\\DatabaseSeeder',
-            '--force' => true,
-        ]));
+            '--class' => $this->option('seeder') ?: 'DatabaseSeeder',
+            '--force' => $this->option('force'),
+        ]);
     }
 
     /**
@@ -101,16 +118,19 @@ class FreshCommand extends Command
     protected function getOptions()
     {
         return [
-            ['database', null, InputOption::VALUE_OPTIONAL, 'The database connection to use'],
-            ['drop-views', null, InputOption::VALUE_NONE, 'Drop all tables and views'],
-            ['drop-types', null, InputOption::VALUE_NONE, 'Drop all tables and types (Postgres only)'],
-            ['force', null, InputOption::VALUE_NONE, 'Force the operation to run when in production'],
-            ['path', null, InputOption::VALUE_OPTIONAL | InputOption::VALUE_IS_ARRAY, 'The path(s) to the migrations files to be executed'],
-            ['realpath', null, InputOption::VALUE_NONE, 'Indicate any provided migration file paths are pre-resolved absolute paths'],
-            ['schema-path', null, InputOption::VALUE_OPTIONAL, 'The path to a schema dump file'],
-            ['seed', null, InputOption::VALUE_NONE, 'Indicates if the seed task should be re-run'],
-            ['seeder', null, InputOption::VALUE_OPTIONAL, 'The class name of the root seeder'],
-            ['step', null, InputOption::VALUE_NONE, 'Force the migrations to be run so they can be rolled back individually'],
+            ['database', null, InputOption::VALUE_OPTIONAL, 'The database connection to use.'],
+
+            ['drop-views', null, InputOption::VALUE_NONE, 'Drop all tables and views.'],
+
+            ['force', null, InputOption::VALUE_NONE, 'Force the operation to run when in production.'],
+
+            ['path', null, InputOption::VALUE_OPTIONAL, 'The path to the migrations files to be executed.'],
+
+            ['realpath', null, InputOption::VALUE_NONE, 'Indicate any provided migration file paths are pre-resolved absolute paths.'],
+
+            ['seed', null, InputOption::VALUE_NONE, 'Indicates if the seed task should be re-run.'],
+
+            ['seeder', null, InputOption::VALUE_OPTIONAL, 'The class name of the root seeder.'],
         ];
     }
 }

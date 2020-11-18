@@ -3,6 +3,7 @@
 namespace Illuminate\Database\Eloquent\Relations;
 
 use Illuminate\Support\Str;
+use Illuminate\Database\Eloquent\Builder;
 
 class MorphPivot extends Pivot
 {
@@ -30,7 +31,7 @@ class MorphPivot extends Pivot
      * @param  \Illuminate\Database\Eloquent\Builder  $query
      * @return \Illuminate\Database\Eloquent\Builder
      */
-    protected function setKeysForSaveQuery($query)
+    protected function setKeysForSaveQuery(Builder $query)
     {
         $query->where($this->morphType, $this->morphClass);
 
@@ -44,21 +45,11 @@ class MorphPivot extends Pivot
      */
     public function delete()
     {
-        if (isset($this->attributes[$this->getKeyName()])) {
-            return (int) parent::delete();
-        }
-
-        if ($this->fireModelEvent('deleting') === false) {
-            return 0;
-        }
-
         $query = $this->getDeleteQuery();
 
         $query->where($this->morphType, $this->morphClass);
 
-        return tap($query->delete(), function () {
-            $this->fireModelEvent('deleted', false);
-        });
+        return $query->delete();
     }
 
     /**
@@ -133,7 +124,7 @@ class MorphPivot extends Pivot
     /**
      * Get a new query to restore multiple models by their queueable IDs.
      *
-     * @param  array  $ids
+     * @param  array|int  $ids
      * @return \Illuminate\Database\Eloquent\Builder
      */
     protected function newQueryForCollectionRestoration(array $ids)

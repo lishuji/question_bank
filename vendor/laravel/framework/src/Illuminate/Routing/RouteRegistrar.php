@@ -2,10 +2,9 @@
 
 namespace Illuminate\Routing;
 
-use BadMethodCallException;
 use Closure;
+use BadMethodCallException;
 use Illuminate\Support\Arr;
-use Illuminate\Support\Reflector;
 use InvalidArgumentException;
 
 /**
@@ -20,7 +19,7 @@ use InvalidArgumentException;
  * @method \Illuminate\Routing\RouteRegistrar domain(string $value)
  * @method \Illuminate\Routing\RouteRegistrar middleware(array|string|null $middleware)
  * @method \Illuminate\Routing\RouteRegistrar name(string $value)
- * @method \Illuminate\Routing\RouteRegistrar namespace(string|null $value)
+ * @method \Illuminate\Routing\RouteRegistrar namespace(string $value)
  * @method \Illuminate\Routing\RouteRegistrar prefix(string  $prefix)
  * @method \Illuminate\Routing\RouteRegistrar where(array  $where)
  */
@@ -43,7 +42,7 @@ class RouteRegistrar
     /**
      * The methods to dynamically pass through to the router.
      *
-     * @var string[]
+     * @var array
      */
     protected $passthru = [
         'get', 'post', 'put', 'patch', 'delete', 'options', 'any',
@@ -52,7 +51,7 @@ class RouteRegistrar
     /**
      * The attributes that can be set through this class.
      *
-     * @var string[]
+     * @var array
      */
     protected $allowedAttributes = [
         'as', 'domain', 'middleware', 'name', 'namespace', 'prefix', 'where',
@@ -112,19 +111,6 @@ class RouteRegistrar
     }
 
     /**
-     * Route an API resource to a controller.
-     *
-     * @param  string  $name
-     * @param  string  $controller
-     * @param  array  $options
-     * @return \Illuminate\Routing\PendingResourceRegistration
-     */
-    public function apiResource($name, $controller, array $options = [])
-    {
-        return $this->router->apiResource($name, $controller, $this->attributes + $options);
-    }
-
-    /**
      * Create a route group with shared attributes.
      *
      * @param  \Closure|string  $callback
@@ -181,18 +167,6 @@ class RouteRegistrar
             $action = ['uses' => $action];
         }
 
-        if (is_array($action) &&
-            ! Arr::isAssoc($action) &&
-            Reflector::isCallable($action)) {
-            if (strncmp($action[0], '\\', 1)) {
-                $action[0] = '\\'.$action[0];
-            }
-            $action = [
-                'uses' => $action[0].'@'.$action[1],
-                'controller' => $action[0].'@'.$action[1],
-            ];
-        }
-
         return array_merge($this->attributes, $action);
     }
 
@@ -212,7 +186,7 @@ class RouteRegistrar
         }
 
         if (in_array($method, $this->allowedAttributes)) {
-            if ($method === 'middleware') {
+            if ($method == 'middleware') {
                 return $this->attribute($method, is_array($parameters[0]) ? $parameters[0] : $parameters);
             }
 

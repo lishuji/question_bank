@@ -3,19 +3,20 @@
 namespace Illuminate\Foundation\Console;
 
 use Closure;
-use Illuminate\Console\Application as Artisan;
-use Illuminate\Console\Command;
-use Illuminate\Console\Scheduling\Schedule;
-use Illuminate\Contracts\Console\Kernel as KernelContract;
-use Illuminate\Contracts\Debug\ExceptionHandler;
-use Illuminate\Contracts\Events\Dispatcher;
-use Illuminate\Contracts\Foundation\Application;
-use Illuminate\Support\Arr;
-use Illuminate\Support\Env;
-use Illuminate\Support\Str;
-use ReflectionClass;
-use Symfony\Component\Finder\Finder;
+use Exception;
 use Throwable;
+use ReflectionClass;
+use Illuminate\Support\Arr;
+use Illuminate\Support\Str;
+use Illuminate\Console\Command;
+use Symfony\Component\Finder\Finder;
+use Illuminate\Console\Scheduling\Schedule;
+use Illuminate\Contracts\Events\Dispatcher;
+use Illuminate\Console\Application as Artisan;
+use Illuminate\Contracts\Debug\ExceptionHandler;
+use Illuminate\Contracts\Foundation\Application;
+use Illuminate\Contracts\Console\Kernel as KernelContract;
+use Symfony\Component\Debug\Exception\FatalThrowableError;
 
 class Kernel implements KernelContract
 {
@@ -36,7 +37,7 @@ class Kernel implements KernelContract
     /**
      * The Artisan application instance.
      *
-     * @var \Illuminate\Console\Application|null
+     * @var \Illuminate\Console\Application
      */
     protected $artisan;
 
@@ -57,7 +58,7 @@ class Kernel implements KernelContract
     /**
      * The bootstrap classes for the application.
      *
-     * @var string[]
+     * @var array
      */
     protected $bootstrappers = [
         \Illuminate\Foundation\Bootstrap\LoadEnvironmentVariables::class,
@@ -98,27 +99,19 @@ class Kernel implements KernelContract
     protected function defineConsoleSchedule()
     {
         $this->app->singleton(Schedule::class, function ($app) {
-            return tap(new Schedule($this->scheduleTimezone()), function ($schedule) {
-                $this->schedule($schedule->useCache($this->scheduleCache()));
-            });
+            return new Schedule;
         });
-    }
 
-    /**
-     * Get the name of the cache store that should manage scheduling mutexes.
-     *
-     * @return string
-     */
-    protected function scheduleCache()
-    {
-        return Env::get('SCHEDULE_CACHE_DRIVER');
+        $schedule = $this->app->make(Schedule::class);
+
+        $this->schedule($schedule);
     }
 
     /**
      * Run the console application.
      *
      * @param  \Symfony\Component\Console\Input\InputInterface  $input
-     * @param  \Symfony\Component\Console\Output\OutputInterface|null  $output
+     * @param  \Symfony\Component\Console\Output\OutputInterface  $output
      * @return int
      */
     public function handle($input, $output = null)
@@ -127,7 +120,15 @@ class Kernel implements KernelContract
             $this->bootstrap();
 
             return $this->getArtisan()->run($input, $output);
+        } catch (Exception $e) {
+            $this->reportException($e);
+
+            $this->renderException($output, $e);
+
+            return 1;
         } catch (Throwable $e) {
+            $e = new FatalThrowableError($e);
+
             $this->reportException($e);
 
             $this->renderException($output, $e);
@@ -157,18 +158,6 @@ class Kernel implements KernelContract
     protected function schedule(Schedule $schedule)
     {
         //
-    }
-
-    /**
-     * Get the timezone that should be used by default for scheduled events.
-     *
-     * @return \DateTimeZone|string|null
-     */
-    protected function scheduleTimezone()
-    {
-        $config = $this->app['config'];
-
-        return $config->get('app.schedule_timezone', $config->get('app.timezone'));
     }
 
     /**
@@ -223,7 +212,7 @@ class Kernel implements KernelContract
             $command = $namespace.str_replace(
                 ['/', '.php'],
                 ['\\', ''],
-                Str::after($command->getRealPath(), realpath(app_path()).DIRECTORY_SEPARATOR)
+                Str::after($command->getPathname(), app_path().DIRECTORY_SEPARATOR)
             );
 
             if (is_subclass_of($command, Command::class) &&
@@ -251,10 +240,8 @@ class Kernel implements KernelContract
      *
      * @param  string  $command
      * @param  array  $parameters
-     * @param  \Symfony\Component\Console\Output\OutputInterface|null  $outputBuffer
+     * @param  \Symfony\Component\Console\Output\OutputInterface  $outputBuffer
      * @return int
-     *
-     * @throws \Symfony\Component\Console\Exception\CommandNotFoundException
      */
     public function call($command, array $parameters = [], $outputBuffer = null)
     {
@@ -267,7 +254,7 @@ class Kernel implements KernelContract
      * Queue the given console command.
      *
      * @param  string  $command
-     * @param  array  $parameters
+     * @param  array   $parameters
      * @return \Illuminate\Foundation\Bus\PendingDispatch
      */
     public function queue($command, array $parameters = [])
@@ -358,22 +345,22 @@ class Kernel implements KernelContract
     /**
      * Report the exception to the exception handler.
      *
-     * @param  \Throwable  $e
+     * @param  \Exception  $e
      * @return void
      */
-    protected function reportException(Throwable $e)
+    protected function reportException(Exception $e)
     {
         $this->app[ExceptionHandler::class]->report($e);
     }
 
     /**
-     * Render the given exception.
+     * Report the exception to the exception handler.
      *
      * @param  \Symfony\Component\Console\Output\OutputInterface  $output
-     * @param  \Throwable  $e
+     * @param  \Exception  $e
      * @return void
      */
-    protected function renderException($output, Throwable $e)
+    protected function renderException($output, Exception $e)
     {
         $this->app[ExceptionHandler::class]->renderForConsole($output, $e);
     }

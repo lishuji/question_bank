@@ -4,7 +4,7 @@ namespace Illuminate\Console\Scheduling;
 
 use Illuminate\Contracts\Cache\Factory as Cache;
 
-class CacheEventMutex implements EventMutex, CacheAware
+class CacheEventMutex implements EventMutex
 {
     /**
      * The cache repository implementation.
@@ -40,7 +40,7 @@ class CacheEventMutex implements EventMutex, CacheAware
     public function create(Event $event)
     {
         return $this->cache->store($this->store)->add(
-            $event->mutexName(), true, $event->expiresAt * 60
+            $event->mutexName(), true, $event->expiresAt
         );
     }
 

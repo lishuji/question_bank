@@ -1,20 +1,27 @@
 <?php
 
-declare(strict_types=1);
+/**
+ * This file is part of Collision.
+ *
+ * (c) Nuno Maduro <enunomaduro@gmail.com>
+ *
+ *  For the full copyright and license information, please view the LICENSE
+ *  file that was distributed with this source code.
+ */
 
 namespace NunoMaduro\Collision;
 
-use NunoMaduro\Collision\Contracts\Handler as HandlerContract;
-use NunoMaduro\Collision\Contracts\Provider as ProviderContract;
 use Whoops\Run;
 use Whoops\RunInterface;
+use NunoMaduro\Collision\Contracts\Handler as HandlerContract;
+use NunoMaduro\Collision\Contracts\Provider as ProviderContract;
 
 /**
- * @internal
+ * This is an Collision Provider implementation.
  *
- * @see \Tests\Unit\ProviderTest
+ * @author Nuno Maduro <enunomaduro@gmail.com>
  */
-final class Provider implements ProviderContract
+class Provider implements ProviderContract
 {
     /**
      * Holds an instance of the Run.
@@ -32,11 +39,14 @@ final class Provider implements ProviderContract
 
     /**
      * Creates a new instance of the Provider.
+     *
+     * @param \Whoops\RunInterface|null $run
+     * @param \NunoMaduro\Collision\Contracts\Handler|null $handler
      */
     public function __construct(RunInterface $run = null, HandlerContract $handler = null)
     {
-        $this->run     = $run ?: new Run();
-        $this->handler = $handler ?: new Handler();
+        $this->run = $run ?: new Run;
+        $this->handler = $handler ?: new Handler;
     }
 
     /**

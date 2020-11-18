@@ -3,11 +3,11 @@
 namespace Illuminate\Foundation\Bootstrap;
 
 use Exception;
-use Illuminate\Config\Repository;
-use Illuminate\Contracts\Config\Repository as RepositoryContract;
-use Illuminate\Contracts\Foundation\Application;
 use SplFileInfo;
+use Illuminate\Config\Repository;
 use Symfony\Component\Finder\Finder;
+use Illuminate\Contracts\Foundation\Application;
+use Illuminate\Contracts\Config\Repository as RepositoryContract;
 
 class LoadConfiguration
 {
@@ -24,7 +24,7 @@ class LoadConfiguration
         // First we will see if we have a cache configuration file. If we do, we'll load
         // the configuration items from that file so that it is very quick. Otherwise
         // we will need to spin through every configuration file and load them all.
-        if (is_file($cached = $app->getCachedConfigPath())) {
+        if (file_exists($cached = $app->getCachedConfigPath())) {
             $items = require $cached;
 
             $loadedFromCache = true;
@@ -57,7 +57,6 @@ class LoadConfiguration
      * @param  \Illuminate\Contracts\Foundation\Application  $app
      * @param  \Illuminate\Contracts\Config\Repository  $repository
      * @return void
-     *
      * @throws \Exception
      */
     protected function loadConfigurationFiles(Application $app, RepositoryContract $repository)

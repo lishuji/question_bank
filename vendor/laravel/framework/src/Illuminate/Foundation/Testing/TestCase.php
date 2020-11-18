@@ -2,16 +2,12 @@
 
 namespace Illuminate\Foundation\Testing;
 
-use Carbon\Carbon;
-use Carbon\CarbonImmutable;
-use Illuminate\Console\Application as Artisan;
-use Illuminate\Database\Eloquent\Model;
-use Illuminate\Support\Facades\Facade;
-use Illuminate\Support\Str;
 use Mockery;
-use Mockery\Exception\InvalidCountException;
+use Illuminate\Support\Carbon;
+use Illuminate\Support\Facades\Facade;
+use Illuminate\Database\Eloquent\Model;
+use Illuminate\Console\Application as Artisan;
 use PHPUnit\Framework\TestCase as BaseTestCase;
-use Throwable;
 
 abstract class TestCase extends BaseTestCase
 {
@@ -22,14 +18,12 @@ abstract class TestCase extends BaseTestCase
         Concerns\InteractsWithDatabase,
         Concerns\InteractsWithExceptionHandling,
         Concerns\InteractsWithSession,
-        Concerns\InteractsWithTime,
-        Concerns\InteractsWithViews,
         Concerns\MocksApplicationServices;
 
     /**
      * The Illuminate application instance.
      *
-     * @var \Illuminate\Contracts\Foundation\Application
+     * @var \Illuminate\Foundation\Application
      */
     protected $app;
 
@@ -46,13 +40,6 @@ abstract class TestCase extends BaseTestCase
      * @var array
      */
     protected $beforeApplicationDestroyedCallbacks = [];
-
-    /**
-     * The exception thrown while running an application destruction callback.
-     *
-     * @var \Throwable
-     */
-    protected $callbackException;
 
     /**
      * Indicates if we have made it through the base setUp function.
@@ -75,10 +62,8 @@ abstract class TestCase extends BaseTestCase
      *
      * @return void
      */
-    protected function setUp(): void
+    protected function setUp()
     {
-        Facade::clearResolvedInstances();
-
         if (! $this->app) {
             $this->refreshApplication();
         }
@@ -86,8 +71,10 @@ abstract class TestCase extends BaseTestCase
         $this->setUpTraits();
 
         foreach ($this->afterApplicationCreatedCallbacks as $callback) {
-            $callback();
+            call_user_func($callback);
         }
+
+        Facade::clearResolvedInstances();
 
         Model::setEventDispatcher($this->app['events']);
 
@@ -144,13 +131,13 @@ abstract class TestCase extends BaseTestCase
      * Clean up the testing environment before the next test.
      *
      * @return void
-     *
-     * @throws \Mockery\Exception\InvalidCountException
      */
-    protected function tearDown(): void
+    protected function tearDown()
     {
         if ($this->app) {
-            $this->callBeforeApplicationDestroyedCallbacks();
+            foreach ($this->beforeApplicationDestroyedCallbacks as $callback) {
+                call_user_func($callback);
+            }
 
             $this->app->flush();
 
@@ -172,31 +159,17 @@ abstract class TestCase extends BaseTestCase
                 $this->addToAssertionCount($container->mockery_getExpectationCount());
             }
 
-            try {
-                Mockery::close();
-            } catch (InvalidCountException $e) {
-                if (! Str::contains($e->getMethodName(), ['doWrite', 'askQuestion'])) {
-                    throw $e;
-                }
-            }
+            Mockery::close();
         }
 
         if (class_exists(Carbon::class)) {
             Carbon::setTestNow();
         }
 
-        if (class_exists(CarbonImmutable::class)) {
-            CarbonImmutable::setTestNow();
-        }
-
         $this->afterApplicationCreatedCallbacks = [];
         $this->beforeApplicationDestroyedCallbacks = [];
 
         Artisan::forgetBootstrappers();
-
-        if ($this->callbackException) {
-            throw $this->callbackException;
-        }
     }
 
     /**
@@ -210,7 +183,7 @@ abstract class TestCase extends BaseTestCase
         $this->afterApplicationCreatedCallbacks[] = $callback;
 
         if ($this->setUpHasRun) {
-            $callback();
+            call_user_func($callback);
         }
     }
 
@@ -223,23 +196,5 @@ abstract class TestCase extends BaseTestCase
     protected function beforeApplicationDestroyed(callable $callback)
     {
         $this->beforeApplicationDestroyedCallbacks[] = $callback;
-    }
-
-    /**
-     * Execute the application's pre-destruction callbacks.
-     *
-     * @return void
-     */
-    protected function callBeforeApplicationDestroyedCallbacks()
-    {
-        foreach ($this->beforeApplicationDestroyedCallbacks as $callback) {
-            try {
-                $callback();
-            } catch (Throwable $e) {
-                if (! $this->callbackException) {
-                    $this->callbackException = $e;
-                }
-            }
-        }
     }
 }

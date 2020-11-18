@@ -192,7 +192,7 @@ class DebugClassLoader
         ];
 
         if (!isset(self::$caseCheck)) {
-            $file = is_file(__FILE__) ? __FILE__ : rtrim(realpath('.'), \DIRECTORY_SEPARATOR);
+            $file = file_exists(__FILE__) ? __FILE__ : rtrim(realpath('.'), \DIRECTORY_SEPARATOR);
             $i = strrpos($file, \DIRECTORY_SEPARATOR);
             $dir = substr($file, 0, 1 + $i);
             $file = substr($file, 1 + $i);
@@ -409,6 +409,7 @@ class DebugClassLoader
         if (
             'Symfony\Bridge\PhpUnit\Legacy\SymfonyTestsListenerForV7' === $class
             || 'Symfony\Bridge\PhpUnit\Legacy\SymfonyTestsListenerForV6' === $class
+            || 'Test\Symfony\Component\Debug\Tests' === $refl->getNamespaceName()
         ) {
             return [];
         }
@@ -764,7 +765,7 @@ class DebugClassLoader
         }
 
         if (isset($dirFiles[$file])) {
-            return $real.$dirFiles[$file];
+            return $real .= $dirFiles[$file];
         }
 
         $kFile = strtolower($file);
@@ -783,7 +784,7 @@ class DebugClassLoader
             self::$darwinCache[$kDir][1] = $dirFiles;
         }
 
-        return $real.$dirFiles[$kFile];
+        return $real .= $dirFiles[$kFile];
     }
 
     /**
@@ -912,7 +913,7 @@ class DebugClassLoader
         static $patchedMethods = [];
         static $useStatements = [];
 
-        if (!is_file($file = $method->getFileName()) || isset($patchedMethods[$file][$startLine = $method->getStartLine()])) {
+        if (!file_exists($file = $method->getFileName()) || isset($patchedMethods[$file][$startLine = $method->getStartLine()])) {
             return;
         }
 
@@ -1010,7 +1011,7 @@ EOTXT;
         $useMap = [];
         $useOffset = 0;
 
-        if (!is_file($file)) {
+        if (!file_exists($file)) {
             return [$namespace, $useOffset, $useMap];
         }
 
@@ -1053,7 +1054,7 @@ EOTXT;
             return;
         }
 
-        if (!is_file($file = $method->getFileName())) {
+        if (!file_exists($file = $method->getFileName())) {
             return;
         }
 

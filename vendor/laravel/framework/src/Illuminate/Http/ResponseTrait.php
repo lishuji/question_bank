@@ -2,9 +2,9 @@
 
 namespace Illuminate\Http;
 
-use Illuminate\Http\Exceptions\HttpResponseException;
+use Exception;
 use Symfony\Component\HttpFoundation\HeaderBag;
-use Throwable;
+use Illuminate\Http\Exceptions\HttpResponseException;
 
 trait ResponseTrait
 {
@@ -18,7 +18,7 @@ trait ResponseTrait
     /**
      * The exception that triggered the error response (if applicable).
      *
-     * @var \Throwable|null
+     * @var \Exception|null
      */
     public $exception;
 
@@ -59,7 +59,7 @@ trait ResponseTrait
      *
      * @param  string  $key
      * @param  array|string  $values
-     * @param  bool  $replace
+     * @param  bool    $replace
      * @return $this
      */
     public function header($key, $values, $replace = true)
@@ -96,7 +96,7 @@ trait ResponseTrait
      */
     public function cookie($cookie)
     {
-        return $this->withCookie(...func_get_args());
+        return call_user_func_array([$this, 'withCookie'], func_get_args());
     }
 
     /**
@@ -108,7 +108,7 @@ trait ResponseTrait
     public function withCookie($cookie)
     {
         if (is_string($cookie) && function_exists('cookie')) {
-            $cookie = cookie(...func_get_args());
+            $cookie = call_user_func_array('cookie', func_get_args());
         }
 
         $this->headers->setCookie($cookie);
@@ -117,22 +117,12 @@ trait ResponseTrait
     }
 
     /**
-     * Get the callback of the response.
-     *
-     * @return string|null
-     */
-    public function getCallback()
-    {
-        return $this->callback ?? null;
-    }
-
-    /**
      * Set the exception to attach to the response.
      *
-     * @param  \Throwable  $e
+     * @param  \Exception  $e
      * @return $this
      */
-    public function withException(Throwable $e)
+    public function withException(Exception $e)
     {
         $this->exception = $e;
 
@@ -141,8 +131,6 @@ trait ResponseTrait
 
     /**
      * Throws the response in a HttpResponseException instance.
-     *
-     * @return void
      *
      * @throws \Illuminate\Http\Exceptions\HttpResponseException
      */

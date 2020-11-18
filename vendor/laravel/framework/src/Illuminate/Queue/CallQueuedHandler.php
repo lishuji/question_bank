@@ -3,13 +3,10 @@
 namespace Illuminate\Queue;
 
 use Exception;
-use Illuminate\Bus\Batchable;
-use Illuminate\Contracts\Bus\Dispatcher;
-use Illuminate\Contracts\Container\Container;
-use Illuminate\Contracts\Queue\Job;
-use Illuminate\Database\Eloquent\ModelNotFoundException;
-use Illuminate\Pipeline\Pipeline;
 use ReflectionClass;
+use Illuminate\Contracts\Queue\Job;
+use Illuminate\Contracts\Bus\Dispatcher;
+use Illuminate\Database\Eloquent\ModelNotFoundException;
 
 class CallQueuedHandler
 {
@@ -21,22 +18,13 @@ class CallQueuedHandler
     protected $dispatcher;
 
     /**
-     * The container instance.
-     *
-     * @var \Illuminate\Contracts\Container\Container
-     */
-    protected $container;
-
-    /**
      * Create a new handler instance.
      *
      * @param  \Illuminate\Contracts\Bus\Dispatcher  $dispatcher
-     * @param  \Illuminate\Contracts\Container\Container  $container
      * @return void
      */
-    public function __construct(Dispatcher $dispatcher, Container $container)
+    public function __construct(Dispatcher $dispatcher)
     {
-        $this->container = $container;
         $this->dispatcher = $dispatcher;
     }
 
@@ -57,34 +45,17 @@ class CallQueuedHandler
             return $this->handleModelNotFound($job, $e);
         }
 
-        $this->dispatchThroughMiddleware($job, $command);
+        $this->dispatcher->dispatchNow(
+            $command, $this->resolveHandler($job, $command)
+        );
 
         if (! $job->hasFailed() && ! $job->isReleased()) {
             $this->ensureNextJobInChainIsDispatched($command);
-            $this->ensureSuccessfulBatchJobIsRecorded($command);
         }
 
         if (! $job->isDeletedOrReleased()) {
             $job->delete();
         }
-    }
-
-    /**
-     * Dispatch the given job / command through its specified middleware.
-     *
-     * @param  \Illuminate\Contracts\Queue\Job  $job
-     * @param  mixed  $command
-     * @return mixed
-     */
-    protected function dispatchThroughMiddleware(Job $job, $command)
-    {
-        return (new Pipeline($this->container))->send($command)
-                ->through(array_merge(method_exists($command, 'middleware') ? $command->middleware() : [], $command->middleware ?? []))
-                ->then(function ($command) use ($job) {
-                    return $this->dispatcher->dispatchNow(
-                        $command, $this->resolveHandler($job, $command)
-                    );
-                });
     }
 
     /**
@@ -135,29 +106,10 @@ class CallQueuedHandler
     }
 
     /**
-     * Ensure the batch is notified of the successful job completion.
-     *
-     * @param  mixed  $command
-     * @return void
-     */
-    protected function ensureSuccessfulBatchJobIsRecorded($command)
-    {
-        $uses = class_uses_recursive($command);
-
-        if (! in_array(Batchable::class, $uses) ||
-            ! in_array(InteractsWithQueue::class, $uses) ||
-            is_null($command->batch())) {
-            return;
-        }
-
-        $command->batch()->recordSuccessfulJob($command->job->uuid());
-    }
-
-    /**
      * Handle a model not found exception.
      *
      * @param  \Illuminate\Contracts\Queue\Job  $job
-     * @param  \Throwable  $e
+     * @param  \Exception  $e
      * @return void
      */
     protected function handleModelNotFound(Job $job, $e)
@@ -175,7 +127,9 @@ class CallQueuedHandler
             return $job->delete();
         }
 
-        return $job->fail($e);
+        return FailingJob::handle(
+            $job->getConnectionName(), $job, $e
+        );
     }
 
     /**
@@ -184,52 +138,15 @@ class CallQueuedHandler
      * The exception that caused the failure will be passed.
      *
      * @param  array  $data
-     * @param  \Throwable|null  $e
-     * @param  string  $uuid
+     * @param  \Exception  $e
      * @return void
      */
-    public function failed(array $data, $e, string $uuid)
+    public function failed(array $data, $e)
     {
         $command = unserialize($data['command']);
 
-        $this->ensureFailedBatchJobIsRecorded($uuid, $command, $e);
-        $this->ensureChainCatchCallbacksAreInvoked($uuid, $command, $e);
-
         if (method_exists($command, 'failed')) {
             $command->failed($e);
-        }
-    }
-
-    /**
-     * Ensure the batch is notified of the failed job.
-     *
-     * @param  string  $uuid
-     * @param  mixed  $command
-     * @param  \Throwable  $e
-     * @return void
-     */
-    protected function ensureFailedBatchJobIsRecorded(string $uuid, $command, $e)
-    {
-        if (! in_array(Batchable::class, class_uses_recursive($command)) ||
-            is_null($command->batch())) {
-            return;
-        }
-
-        $command->batch()->recordFailedJob($uuid, $e);
-    }
-
-    /**
-     * Ensure the chained job catch callbacks are invoked.
-     *
-     * @param  string  $uuid
-     * @param  mixed  $command
-     * @param  \Throwable  $e
-     * @return void
-     */
-    protected function ensureChainCatchCallbacksAreInvoked(string $uuid, $command, $e)
-    {
-        if (method_exists($command, 'invokeChainCatchCallbacks')) {
-            $command->invokeChainCatchCallbacks($e);
         }
     }
 }

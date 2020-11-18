@@ -3,7 +3,7 @@
 /*
  * This file is part of Psy Shell.
  *
- * (c) 2012-2020 Justin Hileman
+ * (c) 2012-2018 Justin Hileman
  *
  * For the full copyright and license information, please view the LICENSE
  * file that was distributed with this source code.
@@ -27,7 +27,7 @@ abstract class Command extends BaseCommand
     /**
      * Sets the application instance for this command.
      *
-     * @param Application|null $application An Application instance
+     * @param Application $application An Application instance
      *
      * @api
      */
@@ -232,7 +232,7 @@ abstract class Command extends BaseCommand
     private function formatDefaultValue($default)
     {
         if (\is_array($default) && $default === \array_values($default)) {
-            return \sprintf("['%s']", \implode("', '", $default));
+            return \sprintf("array('%s')", \implode("', '", $default));
         }
 
         return \str_replace("\n", '', \var_export($default, true));
@@ -247,22 +247,15 @@ abstract class Command extends BaseCommand
      */
     protected function getTable(OutputInterface $output)
     {
-        if (!\class_exists(Table::class)) {
+        if (!\class_exists('Symfony\Component\Console\Helper\Table')) {
             return $this->getTableHelper();
         }
 
         $style = new TableStyle();
-
-        // Symfony 4.1 deprecated single-argument style setters.
-        if (\method_exists($style, 'setVerticalBorderChars')) {
-            $style->setVerticalBorderChars(' ');
-            $style->setHorizontalBorderChars('');
-            $style->setCrossingChars('', '', '', '', '', '', '', '', '');
-        } else {
-            $style->setVerticalBorderChar(' ');
-            $style->setHorizontalBorderChar('');
-            $style->setCrossingChar('');
-        }
+        $style
+            ->setVerticalBorderChar(' ')
+            ->setHorizontalBorderChar('')
+            ->setCrossingChar('');
 
         $table = new Table($output);
 
